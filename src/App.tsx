@@ -1,5 +1,4 @@
-import { RecordWithTtl } from 'dns';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './App.css';
 
 type LiquidList = {
@@ -19,7 +18,8 @@ type SolidList = {
 
 function stateFromLocationHash() {
     let state = null
-    let hash = decodeURIComponent(document.location.hash.substr(1))
+    let text = document.location.hash.substr(1)
+    let hash = decodeURIComponent(text)
 
     try {
         state = JSON.parse(hash)
@@ -29,20 +29,24 @@ function stateFromLocationHash() {
     
     if(state === null) {
         state = {
+            tinyurl: text,
             uid: 0,
             volume: 0,
             volumeUnits: "mL",
             massUnits: "g",
             liquids: {},
-            solids: {},
-            knownSolids: {}
+            solids: {}
         }
     }
+
+    console.log(state)
 
     return state
 }
 
 function App() {
+    console.log("App()")
+
     let hashState = stateFromLocationHash()
 
     let solidNameRef = useRef<HTMLInputElement>(null)
@@ -54,9 +58,30 @@ function App() {
     let [uid, setUid] = useState(hashState.uid as number)
     let [liquids, setLiquids] = useState(hashState.liquids as LiquidList)
     let [solids, setSolids] = useState(hashState.solids as SolidList)
-    let [knownSolids] = useState(hashState.knownSolids as {[key: string]: number})
+    let [knownSolids, setKnownSolids] = useState({} as {[key: string]: number})
+    let [tinyurl] = useState(hashState.tinyurl as string)
 
-    document.location.hash = encodeURIComponent(JSON.stringify({uid, volume, volumeUnits, massUnits, liquids, solids, knownSolids: hashState.knownSolids}))
+    document.location.hash = encodeURIComponent(JSON.stringify({tinyurl, uid, volume, volumeUnits, massUnits, liquids, solids}))
+
+    useEffect(() => {
+        let controller = new AbortController()
+
+        async function get() {
+            let knownSolidsReq = await fetch(`https://tinyurl.com/${tinyurl}`, {signal: controller.signal})
+            let json = await knownSolidsReq.json()
+            setKnownSolids(prevValue => json)
+        }
+
+        if(Object.keys(knownSolids).length === 0) {
+            get().catch((err) => {
+                console.error(err)
+            })
+        }
+
+        return () => {
+            controller.abort()
+        }
+    })
 
     let addLiquid = () => {
         setUid(uid + 1)
@@ -175,11 +200,11 @@ function App() {
 
             <label htmlFor={`name_${key}`}>Name</label>
             <br/>
-            <span style={{display: (knownSolidsOptions.length > 0) ? "default" : "none"}}>
-            <select onChange={(e) => onKnownSolidChange(key, e.target.value)} defaultValue={value.name}>{knownSolidsOptions}</select>
+            <span style={{display: (Object.keys(knownSolids).length !== null) ? "default" : "none"}}>
+            <select onChange={(e) => onKnownSolidChange(key, e.target.value)} value={value.name}>{knownSolidsOptions}</select>
             <br/>
             </span>
-            <input onChange={(e) => onSolidNameChange(key, e.target.value)} defaultValue={value.name} id={`name_${key}`} type="text" ref={solidNameRef}/>
+            <input onChange={(e) => onSolidNameChange(key, e.target.value)} value={value.name} id={`name_${key}`} type="text" ref={solidNameRef}/>
             <br/>
 
             <label htmlFor={`displacement_${key}`}>Displacement ({volumeUnits}/{massUnits})</label>
