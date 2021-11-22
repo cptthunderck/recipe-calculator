@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { RecordWithTtl } from 'dns';
+import React, { useRef, useState } from 'react';
 import './App.css';
 
 type LiquidList = {
@@ -33,7 +34,8 @@ function stateFromLocationHash() {
             volumeUnits: "mL",
             massUnits: "g",
             liquids: {},
-            solids: {}
+            solids: {},
+            knownSolids: {}
         }
     }
 
@@ -43,14 +45,18 @@ function stateFromLocationHash() {
 function App() {
     let hashState = stateFromLocationHash()
 
+    let solidNameRef = useRef<HTMLInputElement>(null)
+    let solidDisplacementRef = useRef<HTMLInputElement>(null)
+
     let [volume, setVolume] = useState(hashState.volume as number)
     let [volumeUnits, setVolumeUnits] = useState(hashState.volumeUnits as string)
     let [massUnits, setMassUnits] = useState(hashState.massUnits as string)
     let [uid, setUid] = useState(hashState.uid as number)
     let [liquids, setLiquids] = useState(hashState.liquids as LiquidList)
     let [solids, setSolids] = useState(hashState.solids as SolidList)
+    let [knownSolids] = useState(hashState.knownSolids as {[key: string]: number})
 
-    document.location.hash = encodeURIComponent(JSON.stringify({uid, volume, volumeUnits, massUnits, liquids, solids}))
+    document.location.hash = encodeURIComponent(JSON.stringify({uid, volume, volumeUnits, massUnits, liquids, solids, knownSolids: hashState.knownSolids}))
 
     let addLiquid = () => {
         setUid(uid + 1)
@@ -106,23 +112,23 @@ function App() {
     }
 
     let onSolidNameChange = (uid: string, value: string) => {
-        setSolids({
-            ...solids,
+        setSolids(prevState =>  ({
+            ...prevState,
             [uid]: {
-                ...solids[uid],
+                ...prevState[uid],
                 name: value
             }
-        })
+        }))
     }
 
     let onSolidDisplacementChange = (uid: string, value: number) => {
-        setSolids({
-            ...solids,
+        setSolids(prevState => ({
+            ...prevState,
             [uid]: {
-                ...solids[uid],
+                ...prevState[uid],
                 displacement: value
             }
-        })
+        }))
     }
 
     let onSolidAmountChange = (uid: string, value: number) => {
@@ -151,18 +157,34 @@ function App() {
         </li>
     )
 
+    let knownSolidsOptions = Object.entries(knownSolids).map(([key, value]) =>
+        <option key={key} value={key}>{key}</option>
+    )
+
+    let onKnownSolidChange = (uid: string, value: string) => {
+        solidNameRef.current!.value = value
+        solidDisplacementRef.current!.valueAsNumber = knownSolids[value]
+        onSolidNameChange(uid, value)
+        onSolidDisplacementChange(uid, knownSolids[value])
+    }
+
     let solidsList = Object.entries(solids).map(([key, value]) =>
         <li key={key}>
             <button onClick={() => removeSolid(key)}>Remove</button>
             <br/>
+
             <label htmlFor={`name_${key}`}>Name</label>
             <br/>
-            <input onChange={(e) => onSolidNameChange(key, e.target.value)} defaultValue={value.name} id={`name_${key}`} type="text"/>
+            <span style={{display: (knownSolidsOptions.length > 0) ? "default" : "none"}}>
+            <select onChange={(e) => onKnownSolidChange(key, e.target.value)}>{knownSolidsOptions}</select>
+            <br/>
+            </span>
+            <input onChange={(e) => onSolidNameChange(key, e.target.value)} defaultValue={value.name} id={`name_${key}`} type="text" ref={solidNameRef}/>
             <br/>
 
             <label htmlFor={`displacement_${key}`}>Displacement ({volumeUnits}/{massUnits})</label>
             <br/>
-            <input onChange={(e) => onSolidDisplacementChange(key, e.target.valueAsNumber)} defaultValue={value.displacement || ""} id={`displacement_${key}`} type="number"/>
+            <input onChange={(e) => onSolidDisplacementChange(key, e.target.valueAsNumber)} defaultValue={value.displacement || ""} id={`displacement_${key}`} type="number" ref={solidDisplacementRef}/>
             <br/>
 
             <label htmlFor={`amount_${key}`}>Concentration ({massUnits}/{volumeUnits})</label>
