@@ -176,7 +176,7 @@ function App() {
             <label htmlFor={`name_${key}`}>Name</label>
             <br/>
             <span style={{display: (knownSolidsOptions.length > 0) ? "default" : "none"}}>
-            <select onChange={(e) => onKnownSolidChange(key, e.target.value)}>{knownSolidsOptions}</select>
+            <select onChange={(e) => onKnownSolidChange(key, e.target.value)} defaultValue={value.name}>{knownSolidsOptions}</select>
             <br/>
             </span>
             <input onChange={(e) => onSolidNameChange(key, e.target.value)} defaultValue={value.name} id={`name_${key}`} type="text" ref={solidNameRef}/>
